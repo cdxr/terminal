@@ -1,5 +1,5 @@
 name:                terminal
-version:             0.1.0.0
+version:             0.1.0.1
 synopsis:            Monadic terminal interface built on Haskeline
 -- description:         
 license:             BSD3

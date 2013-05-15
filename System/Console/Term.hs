@@ -18,10 +18,6 @@ This module defines 'TermT', an abstract Monad Transformer used to enrich a
 monad with Haskeline functionality. It exports the class 'MonadTerm' which is
 polymorphic over transformer stacks that contain 'TermT' and 'IO'.
 
-@MonadTerm m@ is equivalent in power to @ReaderT ('Prompt', 'H.InputState') m@.
-However, @MonadTerm@ has a @MonadReader@ instance that lifts the functionality
-of the underlying monad instead of \"stealing\" the @MonadReader@ interface.
-
 /Note:/ This module uses OverlappingInstances to implement the @MonadTerm@
 class for all instances of @MonadTrans@. This is required because @TermT@ is
 itself an instance of @MonadTrans@. It should not be necessary for users to
@@ -33,30 +29,31 @@ module System.Console.Term
 -- * Term
   TermT
 , Term
-, mapTermT
 , runTerm
 , runTermWith
+
 -- * MonadTerm
 , MonadTerm ( inputState, showPrompt, localPrompt )
 , Prompt
 , withPrompt
+
 -- * Haskeline Functionality
 -- | The following functions reimplement Haskeline functionality in terms of
 -- the 'MonadTerm' class.
+
 -- ** Input
 , inputLine
 , inputChar
--- *** Continuation-style
-, inputLineTo
-, inputCharTo
 -- ** Output
 , outputLine
 , outputStr
+
 -- * Monadic Combinators
 , retryWhen
 , retryUnless
 , retryJust
 , retryBlank
+
 -- * Haskeline Utils
 , liftInput
 , runHaskeline
@@ -73,6 +70,8 @@ import Control.Monad.Writer.Class
 import Control.Monad.Error.Class
 import Control.Monad.Reader
 import Control.Monad.Morph
+
+import Control.Monad.Trans.Maybe
 
 import Control.Monad.Base          ( MonadBase, liftBase )
 import Control.Monad.Trans.Control ( MonadBaseControl, liftBaseOp )
@@ -93,35 +92,34 @@ mapPrompt f te = te { tePrompt = f (tePrompt te) }
 
 
 -- | An abstract monad transformer that encapsulates a Haskeline terminal.
-newtype TermT m a = TermT { unTermT :: ReaderT TermEnv m a }
+newtype TermT m a = TermT { unTermT :: ReaderT TermEnv (MaybeT m) a }
     deriving (Functor, Applicative, Alternative, Monad, MonadPlus, MonadFix,
-              MonadIO, MonadTrans, MonadState s, MonadWriter w, MonadError e,
+              MonadIO, MonadState s, MonadWriter w, MonadError e,
               MonadBase b)
-
-mapTermT :: (m a -> n b) -> TermT m a -> TermT n b
-mapTermT f = TermT . mapReaderT f . unTermT
 
 instance (MonadReader e m) => MonadReader e (TermT m) where
     ask = lift ask
-    local = mapTermT . local
+    local f = hoist (local f)
     reader = lift . reader
-
+ 
 instance MFunctor TermT where
-    hoist f = TermT . mapReaderT f . unTermT
+    hoist nat (TermT m) = TermT $ hoist (hoist nat) m
 
+instance MonadTrans TermT where
+    lift = undefined
 
 type Term = TermT IO
 
 -- | Run a @TermT@ computation in an exception-safe manner.
-runTerm :: (MonadBaseControl IO m) => TermT m a -> m a
+runTerm :: (MonadBaseControl IO m) => TermT m a -> m (Maybe a)
 runTerm = runTermWith H.defaultSettings
 
 -- | Run a @TermT@ computation with custom Haskeline settings.
-runTermWith :: (MonadBaseControl IO m) => H.Settings IO -> TermT m a -> m a
-runTermWith hs ma = runHaskeline hs $ runReaderT (unTermT ma) . TE ""
+runTermWith :: (MonadBaseControl IO m) => H.Settings IO -> TermT m a -> m (Maybe a)
+runTermWith hs (TermT m) = runHaskeline hs $ runMaybeT . runReaderT m . TE ""
 
 
-class (MonadIO m) => MonadTerm m where
+class (MonadIO m, MonadPlus m) => MonadTerm m where
     -- | Retrieve the Haskeline 'InputState'.
     inputState :: m H.InputState
     -- | Retrieve the terminal's string prompt.
@@ -135,31 +133,21 @@ instance (MonadIO m) => MonadTerm (TermT m) where
     showPrompt = TermT (asks tePrompt)
     localPrompt f = TermT . local (mapPrompt f) . unTermT
 
-instance (MFunctor t, MonadTrans t, MonadTerm m, MonadIO (t m))
+instance (MFunctor t, MonadTrans t, MonadTerm m, MonadIO (t m), MonadPlus (t m))
         => MonadTerm (t m) where
     inputState = lift inputState
     showPrompt = lift showPrompt
     localPrompt f = hoist (localPrompt f)
 
 -- | Prompt for one line of input.
--- Returns @Just@ the input or @Nothing@ on EOF.
-inputLine :: (MonadTerm m) => m (Maybe String)
-inputLine = liftInput . H.getInputLine =<< showPrompt
+-- Equal to mzero at EOF.
+inputLine :: (MonadTerm m) => m String
+inputLine = maybe mzero return =<< liftInput . H.getInputLine =<< showPrompt
 
 -- | Prompt for one character of input.
--- Returns @Just@ the input or @Nothing@ on EOF.
-inputChar :: (MonadTerm m) => m (Maybe Char)
-inputChar = liftInput . H.getInputChar =<< showPrompt
-
--- | Prompt for one line of input and pass it to a continuation.
--- Equal to @return ()@ on EOF.
-inputLineTo :: (MonadTerm m) => (String -> m ()) -> m ()
-inputLineTo k = maybe (return ()) k =<< inputLine
-
--- | Prompt for one character of input and pass it to a continuation.
--- Equal to @return ()@ on EOF.
-inputCharTo :: (MonadTerm m) => (String -> m ()) -> m ()
-inputCharTo k = maybe (return ()) k =<< inputLine
+-- Equal to mzero at EOF.
+inputChar :: (MonadTerm m) => m Char
+inputChar = maybe mzero return =<< liftInput . H.getInputChar =<< showPrompt
 
 
 -- | Write a String to stdout, followed by a newline.
@@ -213,7 +201,7 @@ liftInput ma = do
     liftIO $ H.queryInput i ma
 
 
--- this should really be in System.Console.Haskeline.IO:
+-- perhaps this belongs in System.Console.Haskeline.IO:
 
 -- | Run a Haskeline 'InputState' computation in an exception-safe manner.
 runHaskeline :: (MonadBaseControl IO m)
