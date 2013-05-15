@@ -22,6 +22,9 @@ polymorphic over transformer stacks that contain 'TermT' and 'IO'.
 class for all instances of @MonadTrans@. This is required because @TermT@ is
 itself an instance of @MonadTrans@. It should not be necessary for users to
 define new instances of @MonadTerm@.
+
+In the future, this may be removed in favor of the more common practice of
+simply defining an instance for each type in the transformers package.
 -}
 
 module System.Console.Term
@@ -29,8 +32,16 @@ module System.Console.Term
 -- * Term
   TermT
 , Term
+
+-- ** Evaluation
+-- | The following functions utilize the @MonadBaseControl IO@ parameter to
+-- provide exception-safe resource handling of the underlying Haskeline
+-- 'H.InputState':
+
 , runTerm
 , runTermWith
+, loopTerm
+, loopTermWith
 
 -- * MonadTerm
 , MonadTerm ( inputState, showPrompt, localPrompt )
@@ -56,6 +67,7 @@ module System.Console.Term
 
 -- * Haskeline Utils
 , liftInput
+, interpretTerm
 , runHaskeline
 )
 where
@@ -110,14 +122,40 @@ instance MonadTrans TermT where
 
 type Term = TermT IO
 
--- | Run a @TermT@ computation in an exception-safe manner.
+
+
+-- | Interpret a TermT computation as a function of a Haskeline 'H.InputState'.
+-- Users should avoid this in favor of 'runTerm' or 'loopTerm'.
+interpretTerm :: TermT m a -> H.InputState -> m (Maybe a)
+interpretTerm (TermT m) = runMaybeT . runReaderT m . TE ""
+
+
+-- | Run a @TermT@ computation, returning @Just@ a value or @Nothing@ if EOF
+-- was encountered. Equivalent to @'runTermWith' 'H.defaultSettings'@
 runTerm :: (MonadBaseControl IO m) => TermT m a -> m (Maybe a)
 runTerm = runTermWith H.defaultSettings
 
 -- | Run a @TermT@ computation with custom Haskeline settings.
+-- Returns @Just@ a value or @Nothing@ if EOF was encountered.
 runTermWith :: (MonadBaseControl IO m) => H.Settings IO -> TermT m a -> m (Maybe a)
-runTermWith hs (TermT m) = runHaskeline hs $ runMaybeT . runReaderT m . TE ""
+runTermWith hs = runHaskeline hs . interpretTerm
 
+
+-- | Equivalent to @'loopTermWith' 'H.defaultSettings'@
+loopTerm :: (MonadBaseControl IO m) => TermT m a -> m [a]
+loopTerm = loopTermWith H.defaultSettings
+
+-- | Run a @TermT@ computation repeatedly until it returns 'Nothing',
+-- returning a list of the results.
+loopTermWith :: (MonadBaseControl IO m) => H.Settings IO -> TermT m a -> m [a]
+loopTermWith hs t = runHaskeline hs loop
+  where
+    loop is = do
+        ma <- interpretTerm t is 
+        case ma of
+            Nothing -> return []
+            Just a  -> fmap (a:) (loop is)
+        
 
 class (MonadIO m, MonadPlus m) => MonadTerm m where
     -- | Retrieve the Haskeline 'InputState'.
@@ -214,17 +252,3 @@ runHaskeline hs k = bracket $ \i -> k i <* liftBase (H.closeInput i)
         bracketOnError (H.initializeInput hs) H.cancelInput
 
 
-
--- TODO
--- add TermT instances for MonadTransControl and MonadBaseControl
--- this will enable the following:
-{-
-layerTest :: IO ()
-layerTest = runTerm $ runTerm term
-  where
-    term :: TermT Term ()
-    term = do
-        Just a <- inputLine
-        Just b <- lift $ inputLine <* outputLine a
-        outputLine b
--}

@@ -1,13 +1,19 @@
 import System.Console.Term
 
-import Control.Monad       ( mzero, void )
+import Control.Monad       ( guard )
 
 
-testTerm :: Term ()
-testTerm = reader =<< inputLine
-  where
-    reader "quit" = mzero
-    reader input  = outputLine $ "got " ++ input
+testTerm :: Term Int
+testTerm = do
+    s <- inputLine
+    guard (s /= "quit")
+    outputLine $ if null s
+        then "Nothing entered."
+        else "Got " ++ s
+    return (length s)
 
 main :: IO ()
-main = void $ runTerm $ withPrompt "test> " testTerm
+main = do
+    xs <- loopTerm $ withPrompt "test> " testTerm
+    putStr "lengths: "
+    print xs
