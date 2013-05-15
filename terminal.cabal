@@ -1,0 +1,16 @@
+name:                terminal
+version:             0.1.0.0
+synopsis:            Monadic terminal interface built on Haskeline
+-- description:         
+license:             BSD3
+license-file:        LICENSE
+author:              Craig Roche
+maintainer:          cdxr01@gmail.com
+copyright:           (c) Craig Roche 2013
+category:            System
+build-type:          Simple
+cabal-version:       >=1.8
+
+library
+  exposed-modules:     System.Console.Term
+  build-depends:       base ==4.6.*, haskeline ==0.7.*, transformers ==0.3.*, mtl ==2.1.*, mmorph ==1.0.*, transformers-base ==0.4.*, monad-control ==0.3.*
