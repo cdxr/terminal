@@ -59,12 +59,6 @@ module System.Console.Term
 , outputLine
 , outputStr
 
--- * Monadic Combinators
-, retryWhen
-, retryUnless
-, retryJust
-, retryBlank
-
 -- * Haskeline Utils
 , liftInput
 , interpretTerm
@@ -199,34 +193,6 @@ outputStr = liftInput . H.outputStr
 -- | Execute a computation with the given 'Prompt'.
 withPrompt :: (MonadTerm m) => String -> m a -> m a
 withPrompt = localPrompt . const
-
-
-------------------------------------------------------------------------------
--- Monadic Combinators
-
--- | @retryJust f ma@ executes the monadic action @ma@ and applies @f@ to
--- its result. If @ma >>= f@ is @Nothing@, the result of ma is returned. If
--- it is @Just errMsg@, @errMsg@ is printed to stdout and @ma@ is tried
--- again.
-retryJust :: (MonadTerm m) => (a -> Maybe String) -> m a -> m a
-retryJust f ma = do
-    x <- ma
-    case f x of
-        Nothing -> return x
-        Just errStr -> outputLine errStr >> retryJust f ma
-
-retryWhen :: (Monad m) => (a -> Bool) -> m a -> m a
-retryWhen p ma = do
-    x <- ma
-    if p x
-      then retryWhen p ma
-      else return x
-
-retryUnless :: (Monad m) => (a -> Bool) -> m a -> m a
-retryUnless p = retryWhen (not . p)
-
-retryBlank :: (Monad m) => m [a] -> m [a]
-retryBlank = retryWhen null
 
 
 ------------------------------------------------------------------------------
