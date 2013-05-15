@@ -200,9 +200,9 @@ withPrompt = localPrompt . const
 
 -- | Lift a Haskeline InputT action to a MonadTerm action.
 liftInput :: (MonadTerm m) => H.InputT IO a -> m a
-liftInput ma = do
+liftInput m = do
     i <- inputState
-    liftIO $ H.queryInput i ma
+    liftIO $ H.queryInput i m
 
 
 -- perhaps this belongs in System.Console.Haskeline.IO:
