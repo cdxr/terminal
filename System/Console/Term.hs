@@ -226,20 +226,6 @@ runHaskeline hs k = bracket $ \i -> k i <* liftBase (H.closeInput i)
         bracketOnError (H.initializeInput hs) H.cancelInput
 
 
-------------------------------------------------------------------------------
--- Simple test
-
-testTerm :: Term ()
-testTerm = inputLineTo reader
-  where
-    reader "quit" = return ()
-    reader input  = do
-        outputLine $ "got " ++ input
-        testTerm
-
-test :: IO ()
-test = runTerm $ withPrompt "test> " testTerm
-
 
 -- TODO
 -- add TermT instances for MonadTransControl and MonadBaseControl
