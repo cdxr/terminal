@@ -1,13 +1,13 @@
 import System.Console.Term
 
+import Control.Monad       ( mzero, void )
+
 
 testTerm :: Term ()
-testTerm = inputLineTo reader
+testTerm = reader =<< inputLine
   where
-    reader "quit" = return ()
-    reader input  = do
-        outputLine $ "got " ++ input
-        testTerm
+    reader "quit" = mzero
+    reader input  = outputLine $ "got " ++ input
 
 main :: IO ()
-main = runTerm $ withPrompt "test> " testTerm
+main = void $ runTerm $ withPrompt "test> " testTerm
