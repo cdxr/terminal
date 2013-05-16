@@ -56,6 +56,9 @@ module System.Console.Term
 -- ** Input
 , inputLine
 , inputChar
+, tryInputLine
+, tryInputChar
+
 -- ** Output
 , outputLine
 , outputStr
@@ -172,15 +175,26 @@ instance (MFunctor t, MonadTrans t, MonadTerm m, MonadIO (t m), MonadPlus (t m))
     showPrompt = lift showPrompt
     localPrompt f = hoist (localPrompt f)
 
+
 -- | Prompt for one line of input.
 -- Equal to mzero at EOF.
 inputLine :: (MonadTerm m) => m String
-inputLine = maybe mzero return =<< liftInput . H.getInputLine =<< showPrompt
+inputLine = maybe mzero return =<< tryInputLine
+
+-- | Prompt for one line of input.
+-- Return @Just@ the input or @Nothing@ at EOF.
+tryInputLine :: (MonadTerm m) => m (Maybe String)
+tryInputLine = liftInput . H.getInputLine =<< showPrompt
 
 -- | Prompt for one character of input.
 -- Equal to mzero at EOF.
 inputChar :: (MonadTerm m) => m Char
-inputChar = maybe mzero return =<< liftInput . H.getInputChar =<< showPrompt
+inputChar = maybe mzero return =<< tryInputChar
+
+-- | Prompt for one character of input.
+-- Return @Just@ the input or @Nothing@ at EOF.
+tryInputChar :: (MonadTerm m) => m (Maybe Char)
+tryInputChar = liftInput . H.getInputChar =<< showPrompt
 
 
 -- | Write a String to stdout, followed by a newline.
