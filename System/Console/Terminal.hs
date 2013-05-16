@@ -6,7 +6,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-|
-Module      : System.Console.Term
+Module      : System.Console.Terminal
 Copyright   : (c) Craig Roche 2013
 License     : BSD-style
 
@@ -28,7 +28,7 @@ In the future, this may be removed in favor of the more common practice of
 simply defining an instance for each type in the transformers package.
 -}
 
-module System.Console.Term
+module System.Console.Terminal
 (
 -- * Term
   TermT
