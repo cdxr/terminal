@@ -14,9 +14,10 @@ Maintainer  : cdxr01@gmail.com
 Stability   : experimental
 Portability : non-portable
 
-This module defines 'TermT', an abstract Monad Transformer used to enrich a
-monad with Haskeline functionality. It exports the class 'MonadTerm' which is
-polymorphic over transformer stacks that contain 'TermT' and 'IO'.
+This module defines 'TermT', an abstract monad transformer used to enrich an
+IO-based monad stack with Haskeline functionality. It exports the class
+'MonadTerm' which is polymorphic over transformer stacks that contain 'TermT'
+and 'IO'.
 
 /Note:/ This module uses OverlappingInstances to implement the @MonadTerm@
 class for all instances of @MonadTrans@. This is required because @TermT@ is
@@ -140,7 +141,7 @@ loopTerm :: (MonadBaseControl IO m) => TermT m a -> m [a]
 loopTerm = loopTermWith H.defaultSettings
 
 -- | Run a @TermT@ computation repeatedly until it returns 'Nothing',
--- returning a list of the results.
+-- collecting a list of the results.
 loopTermWith :: (MonadBaseControl IO m) => H.Settings IO -> TermT m a -> m [a]
 loopTermWith hs t = runHaskeline hs loop
   where
