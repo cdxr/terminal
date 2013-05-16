@@ -1,4 +1,4 @@
-import System.Console.Term
+import System.Console.Terminal
 
 import Control.Monad       ( guard )
 
