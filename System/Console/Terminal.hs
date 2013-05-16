@@ -14,8 +14,9 @@ Maintainer  : cdxr01@gmail.com
 Stability   : experimental
 Portability : non-portable
 
-This module defines 'TermT', an abstract monad transformer used to enrich an
-IO-based monad stack with Haskeline functionality. It exports the class
+This module defines 'TermT', an abstract monad transformer used to add Haskeline
+functionality to an IO-based monad stack. It is intended as an alternative to
+Haskeline's InputT transformer. It implements primitives in terms of the class
 'MonadTerm' which is polymorphic over transformer stacks that contain 'TermT'
 and 'IO'.
 
