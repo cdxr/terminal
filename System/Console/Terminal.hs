@@ -223,9 +223,9 @@ liftInput m = do
 
 -- | Run a Haskeline 'InputState' computation in an exception-safe manner.
 runHaskeline :: (MonadBaseControl IO m)
-               => H.Settings IO
-               -> (H.InputState -> m a)
-               -> m a
+             => H.Settings IO
+             -> (H.InputState -> m a)
+             -> m a
 runHaskeline hs k = bracket $ \i -> k i <* liftBase (H.closeInput i)
   where
     bracket = liftBaseOp $
