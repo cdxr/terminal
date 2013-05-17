@@ -50,9 +50,9 @@ module System.Console.Terminal
 , Prompt
 , withPrompt
 
--- * Haskeline Functionality
--- | The following functions reimplement Haskeline functionality in terms of
--- the 'MonadTerm' class.
+-- * Operations
+-- | The following functions encapsulate Haskeline functionality within the
+-- 'MonadTerm' class.
 
 -- ** Input
 , inputLine
@@ -220,8 +220,6 @@ liftInput m = do
     i <- inputState
     liftIO $ H.queryInput i m
 
-
--- perhaps this belongs in System.Console.Haskeline.IO:
 
 -- | Run a Haskeline 'InputState' computation in an exception-safe manner.
 runHaskeline :: (MonadBaseControl IO m)
