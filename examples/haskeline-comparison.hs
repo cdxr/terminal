@@ -10,6 +10,8 @@ readInt :: String -> Int
 readInt = fromMaybe 0 . readMaybe
 
 
+-- Haskeline example ------
+
 exampleH = runInputT defaultSettings (sumInputsH 0)
  
 sumInputsH :: Int -> InputT IO ()
@@ -28,6 +30,8 @@ sumInputsH x = do
         -- recurse with the new sum
         Just s -> sumInputsH $ x + readInt s
 
+
+-- Terminal example ------
 
 exampleT = runTermWith defaultSettings (sumInputsT 0)
 
