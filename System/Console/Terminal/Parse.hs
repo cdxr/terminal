@@ -1,4 +1,23 @@
-module System.Console.Terminal.Parse where
+module System.Console.Terminal.Parse
+(
+-- * Parser Type
+  ParseTermT
+, ParseTerm
+, parseInputLine
+-- * Basic Parsers
+, word
+, end
+-- * Select
+, Select
+, select
+, select'
+, parseSelect 
+, inputSelect 
+-- ** Basic Selects
+, selYesNo
+)
+where
+
 
 import Control.Applicative
 import Control.Monad
