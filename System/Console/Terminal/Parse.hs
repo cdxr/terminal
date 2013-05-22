@@ -24,12 +24,20 @@ import Control.Monad
 import Control.Monad.IO.Class
 
 import Data.Monoid
+import Data.Function ( on )
 import Data.List ( intercalate )
 
 import qualified Text.Parsec as P
 import Text.Parsec ( manyTill, anyChar, string, eof, spaces, choice, (<?>))
 
+import qualified Data.CaseInsensitive as CI ( mk )
+
 import System.Console.Terminal
+
+
+-- | Perform a case-insensitive String comparison
+compareCI :: String -> String -> Bool
+compareCI = (==) `on` CI.mk
 
 
 type ParseTermT m = P.ParsecT String () (TermT m)
@@ -62,9 +70,18 @@ parseInputLine m = runParseTermT m =<< inputLine
 word :: (Monad m) => ParseTermT m String
 word = manyTill anyChar (eof <|> spaces) <?> "word"
 
+rest :: (Monad m) => ParseTermT m String
+rest = manyTill anyChar eof <?> "rest"
+
 -- | @match s@ is a parser that only succeeds when input matches @s@ exactly.
 match :: (Monad m) => String -> ParseTermT m String
 match s = string s <* end
+
+-- | A case-insensitive version of @match@.
+matchCI :: (Monad m) => String -> ParseTermT m String
+matchCI s = guarding (compareCI s) =<< rest
+  where
+    guarding f a = guard (f a) >> return a
 
 -- | Parser that succeeds at end of line. A specialized version of
 -- 'P.eof'.
