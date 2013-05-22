@@ -62,8 +62,11 @@ parseInputLine m = runParseTermT m =<< inputLine
 word :: (Monad m) => ParseTermT m String
 word = manyTill anyChar (eof <|> spaces) <?> "word"
 
+-- | @match s@ is a parser that only succeeds when input matches @s@ exactly.
+match :: (Monad m) => String -> ParseTermT m String
+match s = string s <* end
 
--- | Succeeds at end of line. A specialized version of
+-- | Parser that succeeds at end of line. A specialized version of
 -- 'P.eof'.
 end :: (Monad m) => ParseTermT m ()
 end = eof
@@ -95,7 +98,7 @@ select name = select' name []
 select' :: (Monad m) => String -> [String] -> a -> Select m a
 select' name aliases result = Select [name] (result <$ p)
   where
-    p = choice . map string $ name : aliases
+    p = choice . map match $ name : aliases
 
 -- | Format a concise String representation of available options.
 showOptions :: Select m a -> String
