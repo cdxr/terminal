@@ -59,10 +59,12 @@ module System.Console.Terminal
 , inputChar
 , tryInputLine
 , tryInputChar
+, readLine
 
 -- ** Output
 , outputLine
 , outputStr
+, printLine
 
 -- * Haskeline Utils
 , liftInput
@@ -87,6 +89,8 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Base          ( MonadBase, liftBase )
 import Control.Monad.Trans.Control ( MonadBaseControl, liftBaseOp )
 import Control.Exception           ( bracketOnError )
+
+import Text.Read ( readMaybe )
 
 
 -- | A textual prompt displayed when reading user input from stdin.
@@ -197,6 +201,10 @@ inputChar = maybe mzero return =<< tryInputChar
 tryInputChar :: (MonadTerm m) => m (Maybe Char)
 tryInputChar = liftInput . H.getInputChar =<< showPrompt
 
+-- | Prompt for one line of input, and 'read' it.
+readLine :: (MonadTerm m, Read a) => m (Maybe a)
+readLine = liftM readMaybe inputLine
+
 
 -- | Write a String to stdout, followed by a newline.
 outputLine :: (MonadTerm m) => String -> m ()
@@ -205,6 +213,11 @@ outputLine = liftInput . H.outputStrLn
 -- | Write a String to stdout.
 outputStr :: (MonadTerm m) => String -> m ()
 outputStr = liftInput . H.outputStr
+
+-- | Write a value to stdout using 'show', followed by a newline.
+printLine :: (MonadTerm m, Show a) => a -> m ()
+printLine = outputLine . show
+
 
 -- | Execute a computation with the given 'Prompt'.
 withPrompt :: (MonadTerm m) => String -> m a -> m a
@@ -230,5 +243,3 @@ runHaskeline hs k = bracket $ \i -> k i <* liftBase (H.closeInput i)
   where
     bracket = liftBaseOp $
         bracketOnError (H.initializeInput hs) H.cancelInput
-
-
