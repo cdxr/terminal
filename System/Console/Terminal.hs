@@ -46,7 +46,7 @@ module System.Console.Terminal
 , loopTermWith
 
 -- * MonadTerm
-, MonadTerm ( inputState, showPrompt, localPrompt )
+, MonadTerm ( .. )
 , Prompt
 , withPrompt
 
@@ -55,15 +55,15 @@ module System.Console.Terminal
 -- 'MonadTerm' class.
 
 -- ** Input
+, tryPromptLine
+, tryPromptChar
 , inputLine
 , inputChar
-, tryInputLine
-, tryInputChar
-, readLine
+, promptLine
+, promptChar
 
 -- ** Output
 , outputLine
-, outputStr
 , printLine
 
 -- * Haskeline Utils
@@ -98,12 +98,12 @@ type Prompt = String
 
 -- private
 data TermEnv = TE
-    { tePrompt :: Prompt
-    , teInputState :: H.InputState
+    { termPrompt :: Prompt
+    , termInputState :: H.InputState
     }
 
 mapPrompt :: (Prompt -> Prompt) -> TermEnv -> TermEnv
-mapPrompt f te = te { tePrompt = f (tePrompt te) }
+mapPrompt f te = te { termPrompt = f (termPrompt te) }
 
 
 -- | An abstract monad transformer that encapsulates a Haskeline terminal.
@@ -158,61 +158,82 @@ loopTermWith hs t = runHaskeline hs loop
         case ma of
             Nothing -> return []
             Just a  -> fmap (a:) (loop is)
-        
 
-class (MonadIO m, MonadPlus m) => MonadTerm m where
-    -- | Retrieve the Haskeline 'InputState'.
-    inputState :: m H.InputState
+
+class (Monad m) => MonadTerm m where
     -- | Retrieve the terminal's string prompt.
     showPrompt :: m String
     -- | Execute a computation with a modified 'Prompt'.
     -- Similar to 'local'.
     localPrompt :: (Prompt -> Prompt) -> m a -> m a
+    -- | Read one line of input from the user.
+    -- Returns @Just@ the input, or @Nothing@ if the user inputs EOF.
+    tryInputLine :: m (Maybe String)
+    -- | Read one character of input from the user.
+    -- Returns @Just@ the input, or @Nothing@ if the user inputs EOF.
+    tryInputChar :: m (Maybe Char)
+    -- | Write a String to the terminal.
+    outputStr :: String -> m ()
+
 
 instance (MonadIO m) => MonadTerm (TermT m) where
-    inputState = TermT (asks teInputState)
-    showPrompt = TermT (asks tePrompt)
+    showPrompt    = TermT (asks termPrompt)
     localPrompt f = TermT . local (mapPrompt f) . unTermT
+    tryInputLine  = liftInput $ H.getInputLine ""
+    tryInputChar  = liftInput $ H.getInputChar ""
+    outputStr     = liftInput . H.outputStr
 
-instance (MFunctor t, MonadTrans t, MonadTerm m, MonadIO (t m), MonadPlus (t m))
-        => MonadTerm (t m) where
-    inputState = lift inputState
-    showPrompt = lift showPrompt
+instance (MFunctor t, MonadTrans t, Monad (t m), MonadTerm m) => MonadTerm (t m) where
+    showPrompt    = lift showPrompt
     localPrompt f = hoist (localPrompt f)
+    tryInputLine  = lift tryInputLine
+    tryInputChar  = lift tryInputChar
+    outputStr     = lift . outputStr
 
 
--- | Prompt for one line of input.
+outputPrompt :: (MonadTerm m) => m ()
+outputPrompt = showPrompt >>= outputStr
+
+-- | Prompt the user for one line of input.
+-- Returns @Just@ the input, or @Nothing@ if the user inputs EOF.
+tryPromptLine :: (MonadTerm m) => m (Maybe String)
+tryPromptLine = outputPrompt >> tryInputLine
+--tryPrompt = liftInput . H.getInputLine =<< showPrompt
+
+tryPromptChar :: (MonadTerm m) => m (Maybe Char)
+tryPromptChar = outputPrompt >> tryInputChar
+
+
+liftMaybe :: (MonadPlus m) => m (Maybe a) -> m a
+liftMaybe m = maybe mzero return =<< m
+
+-- | Read one line of input.
 -- Equal to mzero at EOF.
-inputLine :: (MonadTerm m) => m String
-inputLine = maybe mzero return =<< tryInputLine
-
--- | Prompt for one line of input.
--- Return @Just@ the input or @Nothing@ at EOF.
-tryInputLine :: (MonadTerm m) => m (Maybe String)
-tryInputLine = liftInput . H.getInputLine =<< showPrompt
+inputLine :: (MonadTerm m, MonadPlus m) => m String
+inputLine = liftMaybe tryInputLine
 
 -- | Prompt for one character of input.
 -- Equal to mzero at EOF.
-inputChar :: (MonadTerm m) => m Char
-inputChar = maybe mzero return =<< tryInputChar
+inputChar :: (MonadTerm m, MonadPlus m) => m Char
+inputChar = liftMaybe tryInputChar
 
--- | Prompt for one character of input.
--- Return @Just@ the input or @Nothing@ at EOF.
-tryInputChar :: (MonadTerm m) => m (Maybe Char)
-tryInputChar = liftInput . H.getInputChar =<< showPrompt
+-- | Prompt the user for one line of input.
+-- Equal to mzero at EOF.
+promptLine :: (MonadTerm m, MonadPlus m) => m String
+promptLine = liftMaybe tryPromptLine
+
+promptChar :: (MonadTerm m, MonadPlus m) => m Char
+promptChar = liftMaybe tryPromptChar
 
 -- | Prompt for one line of input, and 'read' it.
-readLine :: (MonadTerm m, Read a) => m (Maybe a)
-readLine = liftM readMaybe inputLine
+--promptRead :: (MonadTerm m, MonadPlus m, Read a) => m (Maybe a)
+--promptRead = liftM readMaybe inputLine
 
 
 -- | Write a String to stdout, followed by a newline.
 outputLine :: (MonadTerm m) => String -> m ()
-outputLine = liftInput . H.outputStrLn
+outputLine = outputStr . (++ "\n")
 
--- | Write a String to stdout.
-outputStr :: (MonadTerm m) => String -> m ()
-outputStr = liftInput . H.outputStr
 
 -- | Write a value to stdout using 'show', followed by a newline.
 printLine :: (MonadTerm m, Show a) => a -> m ()
@@ -227,12 +248,11 @@ withPrompt = localPrompt . const
 ------------------------------------------------------------------------------
 -- Haskeline Utils
 
--- | Lift a Haskeline InputT action to a MonadTerm action.
-liftInput :: (MonadTerm m) => H.InputT IO a -> m a
+-- | Lift a Haskeline InputT action to a TermT action.
+liftInput :: (MonadIO m) => H.InputT IO a -> TermT m a
 liftInput m = do
-    i <- inputState
+    i <- TermT (asks termInputState)
     liftIO $ H.queryInput i m
-
 
 -- | Run a Haskeline 'InputState' computation in an exception-safe manner.
 runHaskeline :: (MonadBaseControl IO m)
