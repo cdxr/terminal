@@ -1,5 +1,1 @@
 add TermT instances for MonadBaseControl and MonadTransControl
-
-remove MonadIO from class constraints of MonadTerm
-- it should be possible to build pure implementations
-- this will require Haskeline to be fully encapsulated
