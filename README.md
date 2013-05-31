@@ -5,11 +5,11 @@
 It is in early development, and the API is not yet stable.
 
 
-# Changes
+## Changes
 
-## Version 1.0.0.0
+### Version 1.0.0.0
 
-### MonadTerm
+#### MonadTerm
 * removed MonadIO superclass constraint
 * removed MonadPlus superclass constraint
 * removed inputState (and all public Haskeline values)
