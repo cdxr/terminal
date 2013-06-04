@@ -18,5 +18,5 @@ module System.Console.Terminal
 ) where
 
 
-import System.Console.Terminal.Class
+import System.Console.Terminal.Class hiding ( tryGetLine, tryGetChar )
 import System.Console.Terminal.Term
