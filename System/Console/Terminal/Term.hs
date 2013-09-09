@@ -30,9 +30,6 @@ module System.Console.Terminal.Term
 
 , runTerm
 , runTermWith
-, loopTerm
-, loopTermWith
-
 
 -- * Haskeline Utils
 , liftInput
@@ -53,11 +50,7 @@ import Control.Monad.Error.Class
 import Control.Monad.Reader
 import Control.Monad.Morph
 
-import Control.Monad.Trans.Maybe
-
-import Control.Monad.Base          ( MonadBase, liftBase )
-import Control.Monad.Trans.Control ( MonadBaseControl, liftBaseOp )
-import Control.Exception           ( bracketOnError )
+import Control.Monad.Catch
 
 import System.Console.Terminal.Class
 
@@ -73,10 +66,9 @@ mapPrompt f te = te { termPrompt = f (termPrompt te) }
 
 
 -- | An abstract monad transformer that encapsulates a Haskeline terminal.
-newtype TermT m a = TermT { unTermT :: ReaderT TermEnv (MaybeT m) a }
+newtype TermT m a = TermT { unTermT :: ReaderT TermEnv m a }
     deriving (Functor, Applicative, Alternative, Monad, MonadPlus, MonadFix,
-              MonadIO, MonadState s, MonadWriter w, MonadError e,
-              MonadBase b)
+              MonadIO, MonadState s, MonadWriter w, MonadError e, MonadCatch)
 
 instance (MonadReader e m) => MonadReader e (TermT m) where
     ask = lift ask
@@ -84,10 +76,10 @@ instance (MonadReader e m) => MonadReader e (TermT m) where
     reader = lift . reader
  
 instance MFunctor TermT where
-    hoist nat (TermT m) = TermT $ hoist (hoist nat) m
+    hoist nat (TermT m) = TermT $ hoist nat m
 
 instance MonadTrans TermT where
-    lift = undefined
+    lift = TermT . lift
 
 type Term = TermT IO
 
@@ -95,42 +87,26 @@ type Term = TermT IO
 
 -- | Interpret a TermT computation as a function of a Haskeline 'H.InputState'.
 -- Users should avoid this in favor of 'runTerm' or 'loopTerm'.
-interpretTerm :: TermT m a -> H.InputState -> m (Maybe a)
-interpretTerm (TermT m) = runMaybeT . runReaderT m . TE ""
+interpretTerm :: TermT m a -> H.InputState -> m a
+interpretTerm (TermT m) = runReaderT m . TE ""
 
 
 -- | Run a @TermT@ computation, returning @Just@ a value or @Nothing@ if EOF
 -- was encountered. Equivalent to @'runTermWith' 'H.defaultSettings'@
-runTerm :: (MonadBaseControl IO m) => TermT m a -> m (Maybe a)
+runTerm :: (MonadIO m, MonadCatch m) => TermT m a -> m a
 runTerm = runTermWith H.defaultSettings
 
 -- | Run a @TermT@ computation with custom Haskeline settings.
 -- Returns @Just@ a value or @Nothing@ if EOF was encountered.
-runTermWith :: (MonadBaseControl IO m) => H.Settings IO -> TermT m a -> m (Maybe a)
+runTermWith :: (MonadIO m, MonadCatch m) => H.Settings IO -> TermT m a -> m a
 runTermWith hs = runHaskeline hs . interpretTerm
-
-
--- | Equivalent to @'loopTermWith' 'H.defaultSettings'@
-loopTerm :: (MonadBaseControl IO m) => TermT m a -> m [a]
-loopTerm = loopTermWith H.defaultSettings
-
--- | Run a @TermT@ computation repeatedly until it returns 'Nothing',
--- collecting a list of the results.
-loopTermWith :: (MonadBaseControl IO m) => H.Settings IO -> TermT m a -> m [a]
-loopTermWith hs t = runHaskeline hs loop
-  where
-    loop is = do
-        ma <- interpretTerm t is 
-        case ma of
-            Nothing -> return []
-            Just a  -> fmap (a:) (loop is)
 
 
 instance (MonadIO m) => MonadTerm (TermT m) where
     showPrompt    = TermT (asks termPrompt)
     localPrompt f = TermT . local (mapPrompt f) . unTermT
-    tryInputLine  = liftInput $ H.getInputLine ""
-    tryInputChar  = liftInput $ H.getInputChar ""
+    tryGetLine  = liftInput $ H.getInputLine ""
+    tryGetChar  = liftInput $ H.getInputChar ""
     outputStr     = liftInput . H.outputStr
 
 
@@ -145,12 +121,14 @@ liftInput m = do
     liftIO $ H.queryInput i m
 
 -- | Run a Haskeline 'InputState' computation in an exception-safe manner.
-runHaskeline :: (MonadBaseControl IO m)
+runHaskeline :: (MonadIO m, MonadCatch m)
              => H.Settings IO
              -> (H.InputState -> m a)
              -> m a
-runHaskeline hs k = bracket $ \i -> k i <* liftBase (H.closeInput i)
+runHaskeline hs k = bracket mkInputState cancelInputState $ \i -> do
+    a <- k i
+    liftIO $ H.closeInput i
+    return a
   where
-    bracket = liftBaseOp $
-        bracketOnError (H.initializeInput hs) H.cancelInput
-
+    mkInputState = liftIO $ H.initializeInput hs
+    cancelInputState = liftIO . H.cancelInput

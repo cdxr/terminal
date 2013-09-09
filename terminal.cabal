@@ -1,5 +1,5 @@
 name:                terminal
-version:             1.0.0.1
+version:             2.0.0.1
 synopsis:            Terminal interface library
 -- description: 
 license:             BSD3
@@ -13,4 +13,4 @@ cabal-version:       >=1.8
 
 library
   exposed-modules:     System.Console.Terminal, System.Console.Terminal.Class, System.Console.Terminal.Term
-  build-depends:       base ==4.6.*, haskeline ==0.7.*, transformers ==0.3.*, mtl ==2.1.*, mmorph ==1.0.*, transformers-base ==0.4.*, monad-control ==0.3.*, parsec ==3.1.*, case-insensitive ==0.4.*
+  build-depends:       base ==4.6.*, exceptions ==0.3.*, haskeline ==0.7.*, transformers ==0.3.*, mtl ==2.1.*, mmorph ==1.0.*, parsec ==3.1.*, case-insensitive ==0.4.*
