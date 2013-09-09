@@ -13,4 +13,4 @@ cabal-version:       >=1.8
 
 library
   exposed-modules:     System.Console.Terminal, System.Console.Terminal.Class, System.Console.Terminal.Term
-  build-depends:       base ==4.6.*, exceptions ==0.3.*, haskeline ==0.7.*, transformers ==0.3.*, mtl ==2.1.*, mmorph ==1.0.*, case-insensitive ==0.4.*
+  build-depends:       base ==4.6.*, exceptions ==0.3.*, haskeline ==0.7.*, transformers ==0.3.*, mtl ==2.1.*, mmorph ==1.0.*
