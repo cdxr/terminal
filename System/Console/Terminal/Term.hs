@@ -61,10 +61,6 @@ data TermEnv = TE
     , termInputState :: H.InputState
     }
 
-mapPrompt :: (Prompt -> Prompt) -> TermEnv -> TermEnv
-mapPrompt f te = te { termPrompt = f (termPrompt te) }
-
-
 -- | An abstract monad transformer that encapsulates a Haskeline terminal.
 newtype TermT m a = TermT { unTermT :: ReaderT TermEnv m a }
     deriving (Functor, Applicative, Alternative, Monad, MonadPlus, MonadFix,
@@ -105,9 +101,12 @@ runTermWith hs = runHaskeline hs . interpretTerm
 instance (MonadIO m) => MonadTerm (TermT m) where
     showPrompt    = TermT (asks termPrompt)
     localPrompt f = TermT . local (mapPrompt f) . unTermT
+      where
+        mapPrompt f te = te { termPrompt = f (termPrompt te) }
+
     tryGetLine  = liftInput $ H.getInputLine ""
     tryGetChar  = liftInput $ H.getInputChar ""
-    outputStr     = liftInput . H.outputStr
+    outputStr   = liftInput . H.outputStr
 
 
 
@@ -125,7 +124,7 @@ runHaskeline :: (MonadIO m, MonadCatch m)
              => H.Settings IO
              -> (H.InputState -> m a)
              -> m a
-runHaskeline hs k = bracket mkInputState cancelInputState $ \i -> do
+runHaskeline hs k = bracketOnError mkInputState cancelInputState $ \i -> do
     a <- k i
     liftIO $ H.closeInput i
     return a
