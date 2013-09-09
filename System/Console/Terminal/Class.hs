@@ -34,11 +34,8 @@ module System.Console.Terminal.Class
 -- 'MonadTerm' class.
 
 -- ** Input
-, tryInputLine
-, tryInputChar
-, inputLine
-, inputChar
-, inputRead
+, promptLine
+, promptChar
 
 -- ** Output
 , outputLine
@@ -65,13 +62,13 @@ class (Monad m) => MonadTerm m where
     -- Returns @Just@ the input, or @Nothing@ if the user inputs EOF.
     --
     -- This is provided as a primitive operation. Users are encouraged to use
-    -- 'inputLine' or 'tryInputLine' instead.
+    -- 'promptLine' instead.
     tryGetLine :: m (Maybe String)
     -- | Read one character of input from the user.
     -- Returns @Just@ the input, or @Nothing@ if the user inputs EOF.
     --
     -- This is provided as a primitive operation. Users are encouraged to use
-    -- 'inputChar' or 'tryInputChar' instead.
+    -- 'promptChar' instead.
     tryGetChar :: m (Maybe Char)
     -- | Write a String to the terminal.
     outputStr :: String -> m ()
@@ -79,8 +76,8 @@ class (Monad m) => MonadTerm m where
 instance (MFunctor t, MonadTrans t, Monad (t m), MonadTerm m) => MonadTerm (t m) where
     showPrompt    = lift showPrompt
     localPrompt f = hoist (localPrompt f)
-    tryGetLine    = lift tryInputLine
-    tryGetChar    = lift tryInputChar
+    tryGetLine    = lift tryGetLine
+    tryGetChar    = lift tryGetChar
     outputStr     = lift . outputStr
 
 
@@ -89,30 +86,11 @@ outputPrompt = showPrompt >>= outputStr
 
 -- | Prompt the user for one line of input.
 -- Returns @Just@ the input, or @Nothing@ if the user inputs EOF.
-tryInputLine :: (MonadTerm m) => m (Maybe String)
-tryInputLine = outputPrompt >> tryInputLine
+promptLine :: (MonadTerm m) => m (Maybe String)
+promptLine = outputPrompt >> tryGetLine
 
-tryInputChar :: (MonadTerm m) => m (Maybe Char)
-tryInputChar = outputPrompt >> tryInputChar
-
-
-liftMaybe :: (MonadPlus m) => m (Maybe a) -> m a
-liftMaybe m = maybe mzero return =<< m
-
--- | Read one line of input.
--- Equal to mzero at EOF.
-inputLine :: (MonadTerm m, MonadPlus m) => m String
-inputLine = liftMaybe tryInputLine
-
--- | Prompt for one character of input.
--- Equal to mzero at EOF.
-inputChar :: (MonadTerm m, MonadPlus m) => m Char
-inputChar = liftMaybe tryInputChar
-
-
--- | Prompt for one line of input, and 'read' it.
-inputRead :: (MonadTerm m, MonadPlus m, Read a) => m (Maybe a)
-inputRead = liftM readMaybe inputLine
+promptChar :: (MonadTerm m) => m (Maybe Char)
+promptChar = outputPrompt >> tryGetChar
 
 
 -- | Write a String to stdout, followed by a newline.
